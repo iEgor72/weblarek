@@ -4,9 +4,7 @@ export class Basket {
     private products: IProduct[] = [];
 
     addProduct(product: IProduct): void {
-        if (!this.hasProduct(product.id)) {
-            this.products.push(product);
-        }
+        this.products.push(product);
     }
 
     removeProduct(id: string): void {

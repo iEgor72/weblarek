@@ -41,10 +41,6 @@ export class Buyer {
         return errors;
     }
 
-    isValid(): boolean {
-        return Object.keys(this.validate()).length === 0;
-    }
-
     clear(): void {
         this.data = { ...emptyBuyer };
     }

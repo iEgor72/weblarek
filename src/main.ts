@@ -19,6 +19,8 @@ console.log(
     'Товар по идентификатору:',
     catalog.getProductById(apiProducts.items[0].id)
 );
+catalog.setSelectedProduct(apiProducts.items[0]);
+console.log('Выбранный товар:', catalog.getSelectedProduct());
 console.groupEnd();
 
 console.group('Проверка модели корзины');
@@ -42,7 +44,12 @@ buyer.setData('address', 'Москва, улица Примерная, 1');
 buyer.setData('email', 'buyer@example.com');
 buyer.setData('phone', '+7 900 000-00-00');
 console.log('Данные покупателя:', buyer.getData());
-console.log('Данные заполнены корректно:', buyer.isValid());
+const buyerErrors = buyer.validate();
+console.log('Ошибки заполненной формы:', buyerErrors);
+console.log(
+    'Данные заполнены корректно:',
+    Object.keys(buyerErrors).length === 0
+);
 buyer.clear();
 console.log('Данные после очистки:', buyer.getData());
 console.groupEnd();
@@ -50,8 +57,8 @@ console.groupEnd();
 const api = new WebLarekApi(new Api(API_URL));
 
 api.getProducts()
-    .then((products) => {
-        catalog.setProducts(products);
+    .then((response) => {
+        catalog.setProducts(response.items);
         console.log('Каталог, загруженный с сервера:', catalog.getProducts());
     })
     .catch((error: unknown) => {
