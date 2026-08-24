@@ -54,7 +54,8 @@ buyer.clear();
 console.log('Данные после очистки:', buyer.getData());
 console.groupEnd();
 
-const api = new WebLarekApi(new Api(API_URL));
+const baseApi = new Api(API_URL);
+const api = new WebLarekApi(baseApi);
 
 api.getProducts()
     .then((response) => {
