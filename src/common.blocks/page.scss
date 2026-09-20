@@ -15,3 +15,10 @@ html, body.page {
 .page:has(.modal_active) {
 	overflow: hidden;
 }
+
+.page__status {
+	max-width: $maxPageWidth;
+	margin: 1rem auto;
+	padding: 0 $defaultPadding;
+	box-sizing: border-box;
+}
