@@ -11,7 +11,7 @@ export class Success extends Component<ISuccessView> {
         super(container);
         this.description = ensureElement('.order-success__description', container);
         this.button = ensureElement<HTMLButtonElement>('.order-success__close', container);
-        this.button.addEventListener('click', () => events.emit('modal:close'));
+        this.button.addEventListener('click', () => events.emit('success:confirmed'));
     }
 
     set total(value: number) {

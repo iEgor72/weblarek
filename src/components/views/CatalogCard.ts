@@ -15,7 +15,7 @@ export class CatalogCard extends Card<TCatalogCardView> {
     }
 
     set image(value: string) {
-        this.setImage(this.imageElement, value, this.titleElement.textContent || 'Товар');
+        this.setImage(this.imageElement, value);
     }
 
     set category(value: string) {

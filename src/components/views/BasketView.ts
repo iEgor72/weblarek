@@ -7,20 +7,17 @@ export class BasketView extends Component<IBasketView> {
     private list: HTMLElement;
     private price: HTMLElement;
     private button: HTMLButtonElement;
-    private emptyMessage: HTMLElement;
 
     constructor(container: HTMLElement, events: IEvents) {
         super(container);
         this.list = ensureElement('.basket__list', container);
         this.price = ensureElement('.basket__price', container);
         this.button = ensureElement<HTMLButtonElement>('.basket__button', container);
-        this.emptyMessage = document.createElement('li');
-        this.emptyMessage.textContent = 'Корзина пуста';
-        this.button.addEventListener('click', () => events.emit('order:open'));
+        this.button.addEventListener('click', () => events.emit('basket:checkout'));
     }
 
     set items(items: HTMLElement[]) {
-        this.list.replaceChildren(...(items.length ? items : [this.emptyMessage]));
+        this.list.replaceChildren(...items);
     }
 
     set total(value: number) {

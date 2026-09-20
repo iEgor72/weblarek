@@ -202,7 +202,8 @@ Presenter - презентер содержит основную логику п
 
 Компоненты:
 
-- `Page` — каталог, счётчик корзины и сообщение о загрузке каталога.
+- `Header` — кнопка корзины и счётчик в шапке.
+- `Gallery` — список карточек каталога.
 - `Card` — абстрактный родитель трёх карточек с общими сеттерами названия и цены.
 - `CatalogCard`, `PreviewCard`, `BasketCard` — карточки каталога, просмотра и корзины.
 - `BasketView` — список товаров, сумма и кнопка оформления.
@@ -225,7 +226,8 @@ Presenter - презентер содержит основную логику п
 
 | Тип | Поля |
 | --- | --- |
-| `IPageView` | `items: HTMLElement[]`, `counter: number`, `message: string`, `disabled: boolean` |
+| `IHeaderView` | `counter: number`, `disabled: boolean` |
+| `IGalleryView` | `items: HTMLElement[]`, `disabled: boolean` |
 | `TCardView` | `Pick<IProduct, 'title' \| 'price'>` |
 | `TCatalogCardView` | Общие данные карточки, `image: string`, `category: string` |
 | `TPreviewCardView` | Данные каталога, `description: string`, `buttonText: string`, `disabled: boolean` |
@@ -238,7 +240,6 @@ Presenter - презентер содержит основную логику п
 | `ISuccessView` | `total: number` |
 | `TProductEvent` | `Pick<IProduct, 'id'>` |
 | `TBuyerChange` | Объединение `{ field: K; value: IBuyer[K] }` для каждого поля покупателя |
-| `ICheckoutState` | `status: 'idle' \| 'pending' \| 'success' \| 'error'`, `total: number`, `error: string` |
 
 `TBuyerField = keyof IBuyer` задаёт поля покупателя, `TBuyerErrors = Partial<Record<TBuyerField, string>>` — ошибки обязательных полей. `ApiPostMethods` ограничивает методы записи значениями `POST`, `PUT`, `DELETE`. Базовый `IEvents` описывает `on`, `emit` и `trigger`.
 
@@ -246,11 +247,15 @@ Presenter - презентер содержит основную логику п
 
 Все компоненты наследуют `render(data?: Partial<T>): HTMLElement`, в том числе вызов без аргументов. Приведённые ниже сеттеры не возвращают значение. Данные не сохраняются в полях View: текст и флаги записываются непосредственно в DOM. Геттеров для извлечения данных приложения у View нет.
 
-#### Page
+#### Header
 
-`constructor(container: HTMLElement, events: IEvents)` принимает `.page__wrapper`. Приватные поля `gallery: HTMLElement`, `basketButton: HTMLButtonElement`, `basketCounter: HTMLElement`, `status: HTMLElement` содержат ссылки на элементы внутри контейнера.
+`constructor(container: HTMLElement, events: IEvents)` принимает `.header`. Приватные поля `basketButton: HTMLButtonElement` и `basketCounter: HTMLElement` хранят элементы шапки.
 
-Сеттеры: `items: HTMLElement[]` заменяет каталог, `counter: number` обновляет счётчик, `message: string` показывает статус загрузки/ошибки (пустая строка скрывает его), `disabled: boolean` блокирует кнопку корзины. Клик по корзине генерирует `basket:open`.
+Сеттеры: `counter: number` обновляет счётчик, `disabled: boolean` блокирует кнопку на время запроса. Нажатие генерирует `basket:clicked`.
+
+#### Gallery
+
+`constructor(container: HTMLElement)` принимает `.gallery`. Сеттер `items: HTMLElement[]` заменяет содержимое готовыми карточками, `disabled: boolean` управляет DOM-свойством `inert`, блокируя взаимодействие с каталогом на время отправки заказа. Дополнительных полей нет.
 
 #### Card<T extends TCardView>
 
@@ -262,13 +267,13 @@ Presenter - презентер содержит основную логику п
 
 Наследует `Card<TCatalogCardView>`. `constructor(container: HTMLElement, onClick: () => void)` принимает клон `#card-catalog` и обработчик выбора. Приватные поля: `imageElement: HTMLImageElement`, `categoryElement: HTMLElement`.
 
-Сеттеры: `image: string` задаёт полный URL и alt, `category: string` — текст и модификатор категории. Для alt название передаётся в `render` до изображения. Корневая кнопка вызывает `onClick`.
+Сеттеры: `image: string` задаёт полный URL изображения, `category: string` — текст и модификатор категории. Изображение не зависит от порядка остальных сеттеров. Корневая кнопка вызывает `onClick`.
 
 #### PreviewCard
 
 Наследует `Card<TPreviewCardView>`. `constructor(container: HTMLElement, onClick: () => void)` принимает клон `#card-preview` и обработчик покупки/удаления. Приватные поля: `imageElement: HTMLImageElement`, `categoryElement: HTMLElement`, `descriptionElement: HTMLElement`, `button: HTMLButtonElement`.
 
-Сеттеры: `image: string`, `category: string`, `description: string`, `buttonText: string`, `disabled: boolean`. Текст кнопки и возможность покупки определяет презентер. Обработчик установлен на кнопку один раз в конструкторе.
+Сеттеры: `image: string`, `category: string`, `description: string`, `buttonText: string`, `disabled: boolean`. Текст кнопки и возможность покупки определяет презентер. Экземпляр создаётся один раз. Обработчик кнопки сообщает о нажатии без идентификатора: выбранный товар хранится в модели каталога.
 
 #### BasketCard
 
@@ -276,15 +281,15 @@ Presenter - презентер содержит основную логику п
 
 #### BasketView
 
-`constructor(container: HTMLElement, events: IEvents)` принимает клон `#basket`. Приватные поля: `list: HTMLElement`, `price: HTMLElement`, `button: HTMLButtonElement`, `emptyMessage: HTMLElement` — элемент списка с текстом «Корзина пуста», созданный в конструкторе.
+`constructor(container: HTMLElement, events: IEvents)` принимает клон `#basket`. Приватные поля: `list: HTMLElement`, `price: HTMLElement`, `button: HTMLButtonElement`. Пустой список отображает надпись «Корзина пуста» через готовый стиль стартера.
 
-Сеттеры: `items: HTMLElement[]` заменяет список (пустой массив показывает сообщение), `total: number` выводит сумму, `disabled: boolean` управляет оформлением. Кнопка генерирует `order:open`. Сумму и доступность рассчитывает презентер.
+Сеттеры: `items: HTMLElement[]` заменяет список (пустой массив показывает сообщение), `total: number` выводит сумму, `disabled: boolean` управляет оформлением. Кнопка генерирует `basket:checkout`. Сумму и доступность рассчитывает презентер.
 
 #### Modal
 
-`constructor(container: HTMLElement, events: IEvents)` принимает `#modal-container`. Приватные поля: `contentElement: HTMLElement`, `closeButton: HTMLButtonElement`. Крестик, клик по подложке и Escape генерируют `modal:close`.
+`constructor(container: HTMLElement)` принимает `#modal-container`. Приватные поля: `contentElement: HTMLElement`, `closeButton: HTMLButtonElement`. Крестик, клик по подложке и Escape вызывают собственный метод `close()`.
 
-Сеттер `content: HTMLElement` помещает готовый компонент. `open(): void` добавляет `modal_active`, обновляет `aria-hidden` и фокусирует крестик. `close(): void` снимает модификатор и удаляет содержимое из DOM. У `Modal` нет наследников. Стиль `.page:has(.modal_active)` блокирует прокрутку страницы; прокручиваться может только список товаров в корзине, не всё окно.
+Сеттер `content: HTMLElement` помещает готовый компонент. `open(): void` добавляет `modal_active` и фокусирует крестик. Видимость задаётся только классом. `close(): void` снимает модификатор и удаляет содержимое из DOM. У `Modal` нет наследников. Стиль `.page:has(.modal_active)` блокирует прокрутку страницы; прокручиваться может только список товаров в корзине, не всё окно.
 
 #### Form<T extends IFormView>
 
@@ -298,27 +303,15 @@ Presenter - презентер содержит основную логику п
 
 Наследует `Form<TOrderFormView>`. `constructor(container: HTMLFormElement, events: IEvents)` принимает клон `#order`. Приватные поля: `addressInput: HTMLInputElement`, `cardButton: HTMLButtonElement`, `cashButton: HTMLButtonElement`.
 
-Сеттеры: `address: string` обновляет поле, `payment: TPayment | null` выделяет оплату через `button_alt-active` и `aria-pressed`. Ввод адреса и выбор оплаты генерируют `buyer:input`, отправка — `contacts:open`.
+Сеттеры: `address: string` обновляет поле, `payment: TPayment | null` выделяет оплату через `button_alt-active` и `aria-pressed`. Ввод адреса и выбор оплаты генерируют `buyer:input`, отправка — `order:submit`.
 
 #### ContactsForm
 
-Наследует `Form<TContactsFormView>`. `constructor(container: HTMLFormElement, events: IEvents)` принимает клон `#contacts`. Приватные поля: `emailInput: HTMLInputElement`, `phoneInput: HTMLInputElement`. Сеттеры `email: string` и `phone: string` обновляют поля. Ввод генерирует `buyer:input`, отправка — `order:submit`.
+Наследует `Form<TContactsFormView>`. `constructor(container: HTMLFormElement, events: IEvents)` принимает клон `#contacts`. Приватные поля: `emailInput: HTMLInputElement`, `phoneInput: HTMLInputElement`. Сеттеры `email: string` и `phone: string` обновляют поля. Ввод генерирует `buyer:input`, отправка — `contacts:submit`.
 
 #### Success
 
-`constructor(container: HTMLElement, events: IEvents)` принимает клон `#success`. Приватные поля: `description: HTMLElement`, `button: HTMLButtonElement`. Сеттер `total: number` выводит сумму, подтверждённую сервером. Кнопка генерирует `modal:close`.
-
-### Checkout — состояние отправки заказа
-
-Дополнительная модель хранит состояние запроса, чтобы не размещать его во View. `constructor(events: IEvents)` сохраняет приватный брокер. Приватное поле `state: ICheckoutState` содержит статус, сумму и ошибку.
-
-- `getState(): ICheckoutState` возвращает копию состояния;
-- `start(): void` устанавливает `pending`, очищает прошлые сумму и ошибку;
-- `succeed(total: number): void` устанавливает `success` и сохраняет сумму;
-- `fail(error: string): void` сохраняет ошибку и статус `error`;
-- `reset(): void` возвращает состояние `idle`.
-
-Каждый метод изменения состояния генерирует `checkout:changed`.
+`constructor(container: HTMLElement, events: IEvents)` принимает клон `#success`. Приватные поля: `description: HTMLElement`, `button: HTMLButtonElement`. Сеттер `total: number` выводит сумму, подтверждённую сервером. Кнопка генерирует `success:confirmed`.
 
 ### События
 
@@ -327,35 +320,38 @@ Presenter - презентер содержит основную логику п
 | Событие | Источник | Данные | Действие презентера |
 | --- | --- | --- | --- |
 | `catalog:changed` | `Catalog.setProducts` | — | Отобразить каталог |
-| `preview:changed` | `Catalog.setSelectedProduct` | — | Открыть карточку просмотра |
-| `basket:changed` | `Basket.addProduct`, `removeProduct`, `clear` | — | Обновить список, сумму, счётчик и доступность оплаты |
+| `preview:changed` | `Catalog.setSelectedProduct` | — | Обновить и открыть карточку просмотра |
+| `basket:changed` | `Basket.addProduct`, `removeProduct`, `clear` | — | Обновить список, сумму, кнопку оформления и счётчик шапки |
 | `buyer:changed` | `Buyer.setData`, `clear` | — | Обновить формы и ошибки |
-| `checkout:changed` | Методы записи `Checkout` | — | Обновить блокировку, ошибки, результат заказа |
 | `product:select` | Обработчик `CatalogCard` | `TProductEvent` | Выбрать товар в модели |
-| `product:toggle` | Обработчик `PreviewCard` | `TProductEvent` | Добавить/удалить товар, закрыть окно |
+| `preview:clicked` | Обработчик `PreviewCard` | — | Взять выбранный товар из модели, добавить/удалить его, закрыть окно |
 | `basket:remove` | Обработчик `BasketCard` | `TProductEvent` | Удалить товар |
-| `basket:open` | `Page` | — | Открыть корзину |
-| `order:open` | `BasketView` | — | Открыть первый шаг |
+| `basket:clicked` | `Header` | — | Открыть корзину |
+| `basket:checkout` | `BasketView` | — | Открыть первый шаг |
 | `buyer:input` | Обе формы | `TBuyerChange` | Сохранить изменённое поле |
-| `contacts:open` | `OrderForm` | — | Проверить первый шаг, открыть контакты |
-| `order:submit` | `ContactsForm` | — | Проверить данные и отправить заказ |
-| `modal:close` | `Modal`, `Success` | — | Закрыть окно |
+| `order:submit` | `OrderForm` | — | Открыть контакты |
+| `contacts:submit` | `ContactsForm` | — | Отправить заказ |
+| `success:confirmed` | `Success` | — | Закрыть окно |
 
 ### Презентер
 
-Презентер — обработчики в `src/main.ts`, без отдельного класса. Базовый `Api` передаётся в `WebLarekApi` через композицию. Карточки получают callback от `events.trigger(...)` с id товара: событие возникает только при вызове callback карточкой. Обработчики презентера не вызывают `emit`.
+Презентер — обработчики в `src/main.ts`, без отдельного класса. Базовый `Api` передаётся в `WebLarekApi` через композицию. Динамические карточки каталога и корзины получают callback от `events.trigger(...)` с id товара. Единственная карточка превью сообщает только о нажатии. Обработчики презентера не вызывают `emit`.
 
-`renderBasket(): void` читает товары и расчёты из `Basket`, создаёт строки с последовательными номерами, обновляет корзину и счётчик. `renderForms(): void` читает `Buyer` и `Checkout`, разделяет ошибки по двум шагам, передаёт результат формам. Эти функции вызываются при событиях моделей и открытии окон.
+`renderBasket(): void` читает товары и расчёты из `Basket`, создаёт строки с последовательными номерами, обновляет корзину. Счётчик отдельного `Header` обновляется в том же обработчике изменения корзины. `renderForms(): void` читает данные и результат `Buyer.validate()`, разделяет ошибки по двум шагам и передаёт их формам.
 
-Товар без цены нельзя добавить. Выбранный товар удаляется повторным нажатием в карточке, а не дублируется. Кнопка первого шага доступна после выбора оплаты и заполнения адреса, оплата — после заполнения всех полей и при непустой корзине. `Buyer.validate()` проверяет заполненность, без дополнительных ограничений формата email и телефона.
+Открытие корзины и шагов оформления только помещает уже подготовленный компонент в модальное окно. Список корзины обновляется по событию `basket:changed`, данные форм — по `buyer:changed`. Начальные пустые состояния задаются вызовами `basket.clear()` и `buyer.clear()` после регистрации обработчиков.
 
-При отправке `IOrder` собирается из `Buyer.getData()`, `Basket.getProductIds()` и `Basket.getTotal()`. `Checkout.start()` блокирует повторную отправку, редактирование форм и изменение корзины. Только после успешного ответа очищаются корзина и покупатель, а `Checkout.succeed()` открывает `Success` через событие модели. При ошибке данные остаются, появляется сообщение и можно повторить запрос.
+Товар без цены нельзя добавить. Повторное нажатие в превью удаляет выбранный товар. Кнопки форм доступны при отсутствии ошибок соответствующего шага. Правила заполненности задаёт `Buyer.validate()`, без дополнительных ограничений формата email и телефона. Обработчики отправки не повторяют валидацию. Тип оплаты сужается до `TPayment` при формировании запроса: к этому моменту первый шаг уже заполнен.
+
+Заказ собирается из `Buyer.getData()`, `Basket.getProductIds()` и `Basket.getTotal()`. На время запроса презентер блокирует кнопки отправки, редактирование форм, шапку и каталог через сеттеры представлений. Отдельной модели запроса нет. После успешного ответа очищаются корзина и покупатель, а сумма из ответа передаётся прямо в `Success`. При ошибке показывается уведомление браузера, данные сохраняются. При ошибке кнопки ранее валидных форм снова доступны; поля во время запроса не меняются. Блок `finally` снимает временные блокировки редактирования, шапки и каталога.
+
+Ошибка загрузки каталога также показывается уведомлением браузера; дополнительной строки статуса в разметке нет.
 
 ### Утилиты и проверка
 
 `setCardCategory(element: HTMLElement, category: string): void` в `src/utils/view.ts` задаёт текст и заменяет модификатор по `categoryMap`. Неизвестная категория получает цвет «другое». Повторяющаяся логика вынесена из двух карточек в эту функцию.
 
-DOM компонентов ищется только в конструкторе внутри своего контейнера. `ensureElement<T>()` получает элемент, `cloneTemplate<T>()` клонирует шаблон. Три шаблона карточек сохраняются в `main.ts`, поэтому не ищутся повторно при отрисовке.
+DOM компонентов ищется только в конструкторе внутри своего контейнера. `ensureElement<T>()` получает элемент, `cloneTemplate<T>()` клонирует шаблон. Шаблоны динамических карточек каталога и корзины сохраняются в `main.ts`; шаблон превью клонируется один раз при создании компонента.
 
 `npm run build` проверяет TypeScript и собирает `dist`, `npm run preview` запускает собранную версию. Отдельного линтера в стартовом проекте нет, строгие настройки TypeScript сохранены.
 

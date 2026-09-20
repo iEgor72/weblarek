@@ -6,8 +6,8 @@ import { EventEmitter } from './components/base/Events';
 import { Basket } from './components/models/Basket';
 import { Buyer } from './components/models/Buyer';
 import { Catalog } from './components/models/Catalog';
-import { Checkout } from './components/models/Checkout';
-import { Page } from './components/views/Page';
+import { Header } from './components/views/Header';
+import { Gallery } from './components/views/Gallery';
 import { CatalogCard } from './components/views/CatalogCard';
 import { PreviewCard } from './components/views/PreviewCard';
 import { BasketCard } from './components/views/BasketCard';
@@ -16,7 +16,7 @@ import { Modal } from './components/views/Modal';
 import { OrderForm } from './components/views/OrderForm';
 import { ContactsForm } from './components/views/ContactsForm';
 import { Success } from './components/views/Success';
-import type { TBuyerChange, TProductEvent } from './types';
+import type { TBuyerChange, TProductEvent, TPayment } from './types';
 import { API_URL, CDN_URL } from './utils/constants';
 import { cloneTemplate, ensureElement } from './utils/utils';
 
@@ -24,17 +24,17 @@ const events = new EventEmitter();
 const catalog = new Catalog(events);
 const basket = new Basket(events);
 const buyer = new Buyer(events);
-const checkout = new Checkout(events);
 const api = new WebLarekApi(new Api(API_URL));
 
-const page = new Page(ensureElement('.page__wrapper'), events);
-const modal = new Modal(ensureElement('#modal-container'), events);
+const header = new Header(ensureElement('.header'), events);
+const gallery = new Gallery(ensureElement('.gallery'));
+const modal = new Modal(ensureElement('#modal-container'));
 const basketView = new BasketView(cloneTemplate('#basket'), events);
 const orderForm = new OrderForm(cloneTemplate<HTMLFormElement>('#order'), events);
 const contactsForm = new ContactsForm(cloneTemplate<HTMLFormElement>('#contacts'), events);
 const success = new Success(cloneTemplate('#success'), events);
 const catalogTemplate = ensureElement<HTMLTemplateElement>('#card-catalog');
-const previewTemplate = ensureElement<HTMLTemplateElement>('#card-preview');
+const previewCard = new PreviewCard(cloneTemplate('#card-preview'), events.trigger('preview:clicked'));
 const basketTemplate = ensureElement<HTMLTemplateElement>('#card-basket');
 
 function renderBasket(): void {
@@ -48,16 +48,13 @@ function renderBasket(): void {
     basketView.render({
         items,
         total: basket.getTotal(),
-        disabled: basket.getCount() === 0 || checkout.getState().status === 'pending',
+        disabled: basket.getCount() === 0,
     });
-    page.render({ counter: basket.getCount() });
 }
 
 function renderForms(): void {
     const data = buyer.getData();
     const errors = buyer.validate();
-    const state = checkout.getState();
-    const pending = state.status === 'pending';
     const orderErrors = [errors.payment, errors.address].filter(Boolean).join('. ');
     const contactErrors = [errors.email, errors.phone].filter(Boolean).join('. ');
 
@@ -65,15 +62,13 @@ function renderForms(): void {
         payment: data.payment,
         address: data.address,
         errors: orderErrors,
-        valid: !orderErrors && !pending,
-        pending,
+        valid: !orderErrors,
     });
     contactsForm.render({
         email: data.email,
         phone: data.phone,
-        errors: contactErrors || state.error,
-        valid: Object.keys(errors).length === 0 && basket.getCount() > 0 && !pending,
-        pending,
+        errors: contactErrors,
+        valid: !contactErrors,
     });
 }
 
@@ -90,11 +85,10 @@ events.on('catalog:changed', () => {
             image: `${CDN_URL}${product.image}`,
         });
     });
-    page.render({ items, message: items.length ? '' : 'В каталоге пока нет товаров' });
+    gallery.render({ items });
 });
 
 events.on<TProductEvent>('product:select', ({ id }) => {
-    if (checkout.getState().status === 'pending') return;
     const product = catalog.getProductById(id);
     if (product) catalog.setSelectedProduct(product);
 });
@@ -102,11 +96,7 @@ events.on<TProductEvent>('product:select', ({ id }) => {
 events.on('preview:changed', () => {
     const product = catalog.getSelectedProduct();
     if (!product) return;
-    const card = new PreviewCard(
-        cloneTemplate(previewTemplate),
-        events.trigger('product:toggle', { id: product.id })
-    );
-    modal.render({ content: card.render({
+    modal.render({ content: previewCard.render({
         title: product.title,
         price: product.price,
         image: `${CDN_URL}${product.image}`,
@@ -119,85 +109,78 @@ events.on('preview:changed', () => {
     modal.open();
 });
 
-events.on<TProductEvent>('product:toggle', ({ id }) => {
-    if (checkout.getState().status === 'pending') return;
-    const product = catalog.getProductById(id);
+events.on('preview:clicked', () => {
+    const product = catalog.getSelectedProduct();
     if (!product || product.price === null) return;
-    if (basket.hasProduct(id)) basket.removeProduct(id);
+    if (basket.hasProduct(product.id)) basket.removeProduct(product.id);
     else basket.addProduct(product);
     modal.close();
 });
 
 events.on('basket:changed', () => {
     renderBasket();
-    renderForms();
+    header.render({ counter: basket.getCount() });
 });
 
-events.on('basket:open', () => {
-    renderBasket();
+events.on('basket:clicked', () => {
     modal.render({ content: basketView.render() });
     modal.open();
 });
 
 events.on<TProductEvent>('basket:remove', ({ id }) => {
-    if (checkout.getState().status !== 'pending') basket.removeProduct(id);
+    basket.removeProduct(id);
 });
 
-events.on('order:open', () => {
-    if (!basket.getCount() || checkout.getState().status === 'pending') return;
-    checkout.reset();
-    renderForms();
+events.on('basket:checkout', () => {
     modal.render({ content: orderForm.render() });
     modal.open();
 });
 
 events.on<TBuyerChange>('buyer:input', (data) => {
-    if (checkout.getState().status === 'pending') return;
     buyer.setData(data.field, data.value);
 });
 
 events.on('buyer:changed', renderForms);
 
-events.on('contacts:open', () => {
-    const errors = buyer.validate();
-    if (errors.payment || errors.address || !basket.getCount()) return;
-    renderForms();
+events.on('order:submit', () => {
     modal.render({ content: contactsForm.render() });
     modal.open();
 });
 
-events.on('checkout:changed', () => {
-    const state = checkout.getState();
-    page.render({ disabled: state.status === 'pending' });
-    renderForms();
-    if (state.status === 'success') {
-        modal.render({ content: success.render({ total: state.total }) });
-        modal.open();
-    }
-});
-
-events.on('order:submit', async () => {
-    if (checkout.getState().status === 'pending' || !basket.getCount()) return;
+events.on('contacts:submit', async () => {
     const data = buyer.getData();
-    if (Object.keys(buyer.validate()).length || !data.payment) return;
-    checkout.start();
+    contactsForm.render({ valid: false, pending: true });
+    orderForm.render({ valid: false, pending: true });
+    header.render({ disabled: true });
+    gallery.render({ disabled: true });
     try {
         const result = await api.createOrder({
             ...data,
-            payment: data.payment,
+            payment: data.payment as TPayment,
             items: basket.getProductIds(),
             total: basket.getTotal(),
         });
         basket.clear();
         buyer.clear();
-        checkout.succeed(result.total);
+        modal.render({ content: success.render({ total: result.total }) });
+        modal.open();
     } catch {
-        checkout.fail('Не удалось оформить заказ. Попробуйте ещё раз.');
+        contactsForm.render({ valid: true });
+        orderForm.render({ valid: true });
+        window.alert('Не удалось оформить заказ. Попробуйте ещё раз.');
+    } finally {
+        contactsForm.render({ pending: false });
+        orderForm.render({ pending: false });
+        header.render({ disabled: false });
+        gallery.render({ disabled: false });
     }
 });
 
-events.on('modal:close', () => modal.close());
+events.on('success:confirmed', () => modal.close());
+
+basket.clear();
+buyer.clear();
 
 api.getProducts()
     .then((response) => catalog.setProducts(response.items))
-    .catch(() => page.render({ message: 'Не удалось загрузить товары. Обновите страницу.' }));
+    .catch(() => window.alert('Не удалось загрузить товары. Обновите страницу.'));

@@ -42,10 +42,13 @@ export interface IApi {
     post<T extends object>(uri: string, data: object, method?: ApiPostMethods): Promise<T>;
 }
 
-export interface IPageView {
-    items: HTMLElement[];
+export interface IHeaderView {
     counter: number;
-    message: string;
+    disabled: boolean;
+}
+
+export interface IGalleryView {
+    items: HTMLElement[];
     disabled: boolean;
 }
 
@@ -83,9 +86,3 @@ export type TBuyerChange = {
     [K in TBuyerField]: { field: K; value: IBuyer[K] }
 }[TBuyerField];
 export type TProductEvent = Pick<IProduct, 'id'>;
-
-export interface ICheckoutState {
-    status: 'idle' | 'pending' | 'success' | 'error';
-    total: number;
-    error: string;
-}

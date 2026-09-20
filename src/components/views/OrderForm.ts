@@ -9,7 +9,7 @@ export class OrderForm extends Form<TOrderFormView> {
     private cashButton: HTMLButtonElement;
 
     constructor(container: HTMLFormElement, events: IEvents) {
-        super(container, () => events.emit('contacts:open'));
+        super(container, () => events.emit('order:submit'));
         this.addressInput = ensureElement<HTMLInputElement>('[name="address"]', container);
         this.cardButton = ensureElement<HTMLButtonElement>('[name="card"]', container);
         this.cashButton = ensureElement<HTMLButtonElement>('[name="cash"]', container);

@@ -8,7 +8,7 @@ export class ContactsForm extends Form<TContactsFormView> {
     private phoneInput: HTMLInputElement;
 
     constructor(container: HTMLFormElement, events: IEvents) {
-        super(container, () => events.emit('order:submit'));
+        super(container, () => events.emit('contacts:submit'));
         this.emailInput = ensureElement<HTMLInputElement>('[name="email"]', container);
         this.phoneInput = ensureElement<HTMLInputElement>('[name="phone"]', container);
         this.emailInput.addEventListener('input', () => {
